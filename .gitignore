@@ -27,6 +27,10 @@ wheels/
 .env
 .env.*
 !.env.template
+.garth/
+token.json
+**/tokens/
+**/token_data/
 
 # IDE
 .idea/
