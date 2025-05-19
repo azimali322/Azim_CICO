@@ -39,7 +39,12 @@ wheels/
 .AppleDouble
 .LSOverride
 
-# Directories
+# Legacy and test files
+legacy/
+**/TEST*.py
+**/OLD*.py
+**/test*.py
+**/old*.py
 dictionaryoutput/
 garminconnect-0.1.18/
 garmin-connect-export-master/
