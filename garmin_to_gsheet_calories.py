@@ -7,6 +7,7 @@ import traceback
 from garminconnect import Garmin
 import garth
 import time
+from pathlib import Path
 
 # Load environment variables from .env file
 load_dotenv()
@@ -14,7 +15,7 @@ load_dotenv()
 # Google Sheets setup
 SPREADSHEET_NAME = os.getenv('GOOGLE_SHEETS_NAME', 'CICO_Spreadsheet_Automated')
 CREDENTIALS_FILE = os.getenv('GOOGLE_SHEETS_CREDENTIALS_FILE')
-TOKEN_DIR = ".garth_tokens"
+GARTH_HOME = os.getenv("GARTH_HOME", "~/.garth")
 
 # Test mode flag - no actual updates will be made when True
 TEST_MODE = False
@@ -34,16 +35,21 @@ def get_garmin_client():
     password = os.getenv('GARMIN_PASSWORD')
     if not email or not password:
         raise ValueError("Please set GARMIN_EMAIL and GARMIN_PASSWORD environment variables")
+    
+    # Initialize Garmin client
     client = Garmin(email, password)
-    # Try to load tokens
+    
+    # Try to login using stored tokens
     try:
-        garth.resume(TOKEN_DIR)
+        client.garth.resume(GARTH_HOME)
         print("Successfully authenticated using stored tokens!")
     except Exception as e:
         print(f"Could not resume session: {e}")
+        # Login with credentials and save tokens
         client.login()
-        garth.save(TOKEN_DIR)
+        client.garth.dump(GARTH_HOME)
         print("Successfully authenticated with credentials and saved tokens!")
+    
     return client
 
 def get_calories_data(client, date):
