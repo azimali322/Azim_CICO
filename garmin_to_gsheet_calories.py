@@ -41,7 +41,7 @@ def get_garmin_client():
     
     # Try to login using stored tokens
     try:
-        client.garth.resume(GARTH_HOME)
+        client.login(GARTH_HOME)
         print("Successfully authenticated using stored tokens!")
     except Exception as e:
         print(f"Could not resume session: {e}")
