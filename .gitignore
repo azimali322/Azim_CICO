@@ -24,6 +24,9 @@ wheels/
 *.json
 *.csv
 *.xlsx
+.env
+.env.*
+!.env.template
 
 # IDE
 .idea/
@@ -39,4 +42,4 @@ wheels/
 # Directories
 dictionaryoutput/
 garminconnect-0.1.18/
-garmin-connect-export-master/ 
+garmin-connect-export-master/

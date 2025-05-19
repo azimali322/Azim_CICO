@@ -8,17 +8,32 @@ from datetime import date, timedelta, datetime
 import pygsheets
 import pandas as pd
 import numpy as np
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
+
+# Get credentials from environment variables
+email = os.getenv('GARMIN_EMAIL')
+password = os.getenv('GARMIN_PASSWORD')
+if not email or not password:
+    raise ValueError("Please set GARMIN_EMAIL and GARMIN_PASSWORD environment variables")
 
 #log into Garmin Connect
-client = Garmin('azimali322@gmail.com', 'Saf!994Fan')
+client = Garmin(email, password)
 client.login()
 
 #authorization
-gc = pygsheets.authorize(service_file='/Users/azima/Desktop/Python_Fun_Scripts/Azim_CICO/cico-python-sheets-acc0593c5455.json')
+credentials_file = os.getenv('GOOGLE_SHEETS_CREDENTIALS_FILE')
+spreadsheet_name = os.getenv('GOOGLE_SHEETS_NAME', 'CICO_Spreadsheet_Automated')  # Use environment variable with default value
+if not credentials_file:
+    raise ValueError("Please set GOOGLE_SHEETS_CREDENTIALS_FILE environment variable")
+gc = pygsheets.authorize(service_file=credentials_file)
 
-#open the google spreadsheet (where 'PY to Gsheet Test' is the name of my sheet). 
+#open the google spreadsheet
 #REMINDER THAT YOU NEED TO SHARE THE GSHEET TO THE EMAIL IN THE CREDENTIALS FILE!
-sh = gc.open('CICO_Spreadsheet_Automated')
+sh = gc.open(spreadsheet_name)
 
 #select the first sheet 
 wks = sh[0]
