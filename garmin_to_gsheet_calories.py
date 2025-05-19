@@ -5,6 +5,8 @@ import pygsheets
 from dotenv import load_dotenv
 import traceback
 from garminconnect import Garmin
+import garth
+import time
 
 # Load environment variables from .env file
 load_dotenv()
@@ -12,6 +14,7 @@ load_dotenv()
 # Google Sheets setup
 SPREADSHEET_NAME = os.getenv('GOOGLE_SHEETS_NAME', 'CICO_Spreadsheet_Automated')
 CREDENTIALS_FILE = os.getenv('GOOGLE_SHEETS_CREDENTIALS_FILE')
+TOKEN_DIR = ".garth_tokens"
 
 # Test mode flag - no actual updates will be made when True
 TEST_MODE = False
@@ -25,10 +28,34 @@ def get_google_sheets_service():
         print(f"Error setting up Google Sheets service: {e}")
         raise
 
+def get_garmin_client():
+    """Initialize Garmin Connect client with token-based authentication."""
+    email = os.getenv('GARMIN_EMAIL')
+    password = os.getenv('GARMIN_PASSWORD')
+    if not email or not password:
+        raise ValueError("Please set GARMIN_EMAIL and GARMIN_PASSWORD environment variables")
+    client = Garmin(email, password)
+    # Try to load tokens
+    try:
+        garth.resume(TOKEN_DIR)
+        print("Successfully authenticated using stored tokens!")
+    except Exception as e:
+        print(f"Could not resume session: {e}")
+        client.login()
+        garth.save(TOKEN_DIR)
+        print("Successfully authenticated with credentials and saved tokens!")
+    return client
+
 def get_calories_data(client, date):
     """Get calories data from Garmin Connect for a specific date."""
     try:
-        # Get daily summary data using the working method
+        # Validate date format (YYYY-MM-DD)
+        try:
+            datetime.strptime(date, '%Y-%m-%d')
+        except ValueError:
+            raise ValueError("Date must be in YYYY-MM-DD format")
+        
+        # Get daily summary data using get_stats method
         summary = client.get_stats(date)
         
         # Extract relevant calorie data
@@ -79,31 +106,26 @@ def main():
     try:
         print("\n=== RUNNING IN TEST MODE - NO ACTUAL UPDATES WILL BE MADE ===" if TEST_MODE else "")
         
-        # Initialize Garmin client
-        email = os.getenv('GARMIN_EMAIL')
-        password = os.getenv('GARMIN_PASSWORD')
-        if not email or not password:
-            raise ValueError("Please set GARMIN_EMAIL and GARMIN_PASSWORD environment variables")
-        
-        client = Garmin(email, password)
-        client.login()
-        print("Successfully authenticated with Garmin Connect!")
+        # Initialize Garmin client using token-based authentication
+        client = get_garmin_client()
         
         # Initialize Google Sheets service
         sheets_service = get_google_sheets_service()
         
-        # Get a specific test date
-        test_date = '2025-05-16'
-        print(f"Fetching data for: {test_date}")
-        
-        # Get calories data
-        calories_data = get_calories_data(client, test_date)
-        
-        if calories_data:
-            # Update Google Sheet
-            update_google_sheet(sheets_service, calories_data)
-        else:
-            print("No calories data available to update")
+        # Get the last 30 days of data, starting from the day before today
+        today = datetime.now()
+        for i in range(1, 31):  # Start from 1 to get the day before today
+            date = (today - timedelta(days=i)).strftime('%Y-%m-%d')
+            print(f"Fetching data for: {date}")
+            
+            # Get calories data
+            calories_data = get_calories_data(client, date)
+            
+            if calories_data:
+                # Update Google Sheet
+                update_google_sheet(sheets_service, calories_data)
+            else:
+                print(f"No calories data available for {date}")
             
     except Exception as e:
         print(f"An error occurred: {e}")
