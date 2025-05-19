@@ -19,6 +19,8 @@ This repository contains Python scripts for managing and processing fitness and 
 
 This repository contains scripts for personal use. Some sensitive files (credentials, personal data) are excluded from version control.
 
+https://github.com/cyberjunky/python-garminconnect/blob/master/reference.ipynb
+
 ## Usage
 
 Individual scripts serve different purposes:
