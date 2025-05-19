@@ -5,15 +5,25 @@ from garminconnect import (
     GarminConnectAuthenticationError,
 )
 from datetime import date, timedelta
-
 import pandas as pd
+import numpy as np
+from dotenv import load_dotenv
+import os
 
+# Load environment variables
+load_dotenv()
+
+# Get credentials from environment variables
+email = os.getenv('GARMIN_EMAIL')
+password = os.getenv('GARMIN_PASSWORD')
+if not email or not password:
+    raise ValueError("Please set GARMIN_EMAIL and GARMIN_PASSWORD environment variables")
+
+client = Garmin(email, password)
+client.login()
 
 today = date.today()
 yesterday = today - timedelta(days=1)
-
-client = Garmin('azimali322@gmail.com', 'Saf!994Fan')
-client.login()
 
 print(yesterday)
 

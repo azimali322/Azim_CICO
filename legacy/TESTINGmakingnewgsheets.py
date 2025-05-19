@@ -2,15 +2,26 @@ from datetime import date, timedelta, datetime
 import pygsheets
 import pandas as pd
 import numpy as np
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
 
 #authorization
-creds_file = '/Users/azima/Desktop/Python_Fun_Scripts/Azim_CICO/cico-python-sheets-638e5a4533f3.json'
+creds_file = os.getenv('GOOGLE_SHEETS_CREDENTIALS_FILE')
+shared_email = os.getenv('GARMIN_EMAIL')  # Reuse the Garmin email for sharing
+if not creds_file:
+	raise ValueError("Please set GOOGLE_SHEETS_CREDENTIALS_FILE environment variable")
+if not shared_email:
+	raise ValueError("Please set GARMIN_EMAIL environment variable")
+
 gc = pygsheets.authorize(service_file=creds_file)
 
 def create_g_sheet_file(new_file_name):
 	res = gc.sheet.create(new_file_name)  # Please set the new Spreadsheet name.
 	createdSpreadsheet = gc.open_by_key(res['spreadsheetId'])
-	createdSpreadsheet.share('azimali322@gmail.com', role='writer', type='user')
+	createdSpreadsheet.share(shared_email, role='writer', type='user')
 
 file_create_question = input('Do you want to create new Google Sheets file (y or n)? > ')
 

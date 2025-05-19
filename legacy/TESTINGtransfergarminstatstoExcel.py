@@ -8,9 +8,20 @@ from datetime import date, timedelta, datetime
 import pygsheets
 import pandas as pd
 import numpy as np
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
+
+# Get credentials from environment variables
+email = os.getenv('GARMIN_EMAIL')
+password = os.getenv('GARMIN_PASSWORD')
+if not email or not password:
+    raise ValueError("Please set GARMIN_EMAIL and GARMIN_PASSWORD environment variables")
 
 #log into Garmin Connect
-client = Garmin('azimali322@gmail.com', 'Saf!994Fan')
+client = Garmin(email, password)
 client.login()
 
 #Today's date in datetime object

@@ -1,8 +1,19 @@
 import pygsheets
 import pandas as pd
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
 
 #authorization
-creds_file = '/Users/azima/Desktop/Python_Fun_Scripts/Azim_CICO/cico-python-sheets-638e5a4533f3.json'
+creds_file = os.getenv('GOOGLE_SHEETS_CREDENTIALS_FILE')
+shared_email = os.getenv('GARMIN_EMAIL')  # Reuse the Garmin email for sharing
+if not creds_file:
+	raise ValueError("Please set GOOGLE_SHEETS_CREDENTIALS_FILE environment variable")
+if not shared_email:
+	raise ValueError("Please set GARMIN_EMAIL environment variable")
+
 gc = pygsheets.authorize(service_file=creds_file)
 # gcdrive = pygsheets.drive.DriveAPIWrapper(http, data_path, retries=3, logger=<Logger pygsheets.drive (WARNING)>)
 
@@ -13,7 +24,7 @@ def are_you_sure(file):
 	if confirm in ['y','Yes','yes','YES']:
 		res = gc.sheet.create(file)  # Please set the new Spreadsheet name.
 		createdSpreadsheet = gc.open_by_key(res['spreadsheetId'])
-		createdSpreadsheet.share('azimali322@gmail.com', role='writer', type='user') # Change user email shared here.
+		createdSpreadsheet.share(shared_email, role='writer', type='user')  # Share with environment variable email
 		return print(new_file_name + ' has been created and shared.')
 	elif confirm in ['n','No','no','NO']:
 		return new_file_prompt()
