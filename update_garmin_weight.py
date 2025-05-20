@@ -1,16 +1,22 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import garth
 from garminconnect import Garmin
 import traceback
+import pygsheets
 from pint import UnitRegistry
+import pandas as pd
 
 # Load environment variables from .env file
 load_dotenv()
 
 # Garmin setup
 GARTH_HOME = os.getenv("GARTH_HOME", "~/.garth")
+
+# Google Sheets setup
+SPREADSHEET_NAME = os.getenv('GOOGLE_SHEETS_NAME', 'CICO_Spreadsheet_Automated')
+CREDENTIALS_FILE = os.getenv('GOOGLE_SHEETS_CREDENTIALS_FILE')
 
 # Test mode flag - no actual updates will be made when True
 TEST_MODE = False  # Set to False for actual updates
@@ -48,6 +54,15 @@ def get_garmin_client():
     
     return client
 
+def get_google_sheets_service():
+    """Initialize and return Google Sheets service."""
+    try:
+        gc = pygsheets.authorize(service_file=CREDENTIALS_FILE)
+        return gc
+    except Exception as e:
+        print(f"Error setting up Google Sheets service: {e}")
+        raise
+
 def update_weight(client, weight_lbs, date=None):
     """
     Update weight in Garmin Connect.
@@ -75,10 +90,11 @@ def update_weight(client, weight_lbs, date=None):
         timestamp = dt.isoformat()
         
         # Check if a weigh-in already exists for the specified date
-        existing_weigh_ins = client.get_daily_weigh_ins(dt.strftime('%Y-%m-%d'))
-        if existing_weigh_ins.get("dateWeightList", []):
-            print(f"A weigh-in already exists for {dt.date()}. Skipping update.")
-            return None
+        if not TEST_MODE and client is not None:
+            existing_weigh_ins = client.get_daily_weigh_ins(dt.strftime('%Y-%m-%d'))
+            if existing_weigh_ins.get("dateWeightList", []):
+                print(f"A weigh-in already exists for {dt.date()}. Skipping update.")
+                return None
         
         if TEST_MODE:
             print(f"\n=== TEST MODE ===")
@@ -104,32 +120,101 @@ def update_weight(client, weight_lbs, date=None):
         print(traceback.format_exc())
         return None
 
-def main():
-    """Main function to update weight in Garmin Connect."""
+def sync_weights_from_sheet():
+    """Sync weights from Google Sheet to Garmin Connect."""
     try:
         print("\n=== RUNNING IN TEST MODE - NO ACTUAL UPDATES WILL BE MADE ===" if TEST_MODE else "")
         
         # Initialize Garmin client
         client = get_garmin_client()
         
-        # Get weight in pounds
-        while True:
-            try:
-                weight_lbs = float(input("Enter your weight in pounds: "))
-                if weight_lbs <= 0:
-                    print("Please enter a positive number.")
-                    continue
-                break
-            except ValueError:
-                print("Please enter a valid number.")
+        # Initialize Google Sheets service
+        sheets_service = get_google_sheets_service()
         
-        # Get date
-        date = input("Enter date (YYYY-MM-DD) or press Enter for today: ").strip()
-        if not date:
-            date = None
+        # Open the spreadsheet and get the first sheet
+        sh = sheets_service.open(SPREADSHEET_NAME)
+        wks = sh[0]
         
-        # Update weight
-        update_weight(client, weight_lbs, date)
+        # Get the last 30 days of data
+        today = datetime.now()
+        dates_to_check = [(today - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(30)]
+        
+        # Get all existing weigh-ins for the date range
+        existing_weigh_ins = set()
+        if not TEST_MODE and client is not None:
+            for date in dates_to_check:
+                try:
+                    weigh_ins = client.get_daily_weigh_ins(date)
+                    if weigh_ins.get("dateWeightList", []):
+                        existing_weigh_ins.add(date)
+                except Exception as e:
+                    print(f"Error checking weigh-ins for {date}: {e}")
+        
+        print(f"Found {len(existing_weigh_ins)} existing weigh-ins in Garmin Connect")
+        
+        # Get all data from the sheet at once
+        df = wks.get_as_df(has_header=True, start=(1,1), end=(wks.rows,5))
+        df['Date'] = pd.to_datetime(df['Date'])
+        
+        # Process each date
+        for date in dates_to_check:
+            # Skip if weight already exists in Garmin
+            if date in existing_weigh_ins:
+                print(f"Skipping {date} - weight already exists in Garmin Connect")
+                continue
+            
+            # Get the row for this date
+            date_row = df[df['Date'] == pd.to_datetime(date)]
+            
+            if len(date_row) == 0:
+                print(f"No data found for {date}")
+                continue
+            
+            # Get weight from column D (4th column)
+            weight = date_row.iloc[0, 3]  # 0-based index, so column D is index 3
+            
+            # Skip if weight is empty or not a number
+            if pd.isna(weight) or not isinstance(weight, (int, float)):
+                print(f"No valid weight found for {date}")
+                continue
+            
+            print(f"\nProcessing weight for {date}: {weight} lbs")
+            update_weight(client, weight, date)
+            
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        print(traceback.format_exc())
+
+def main():
+    """Main function to update weight in Garmin Connect."""
+    try:
+        # Ask user if they want to sync from sheet or enter weight manually
+        choice = input("Do you want to sync weights from Google Sheet? (y/n): ").strip().lower()
+        
+        if choice == 'y':
+            sync_weights_from_sheet()
+        else:
+            # Get weight in pounds
+            while True:
+                try:
+                    weight_lbs = float(input("Enter your weight in pounds: "))
+                    if weight_lbs <= 0:
+                        print("Please enter a positive number.")
+                        continue
+                    break
+                except ValueError:
+                    print("Please enter a valid number.")
+            
+            # Get date
+            date = input("Enter date (YYYY-MM-DD) or press Enter for today: ").strip()
+            if not date:
+                date = None
+            
+            # Initialize Garmin client
+            client = get_garmin_client()
+            
+            # Update weight
+            update_weight(client, weight_lbs, date)
         
     except Exception as e:
         print(f"An error occurred: {e}")
